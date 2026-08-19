@@ -39,9 +39,12 @@ COLLECTION_SAFETY_LABELS = "safety_labels"       # DailyMed / FDA label docs
 # PDF contains multiple graded recommendations (e.g. separate grades per age band),
 # refine per-chunk in chunker.py rather than relying solely on this default.
 
+# NOTE: "filename" is a path RELATIVE TO data/raw/ — it may include subfolders,
+# e.g. "Guidelines/aspirin-use-cvd-prevention-clinician-summary.pdf". Forward
+# slashes work fine on Windows too since these are joined with pathlib.
 CORPUS = [
     {
-        "filename": "aspirin-use-cvd-prevention-final-rec.pdf",
+        "filename": "Guidelines/aspirin-use-cvd-prevention-clinician-summary.pdf",
         "document_name": "USPSTF Aspirin Use to Prevent Cardiovascular Disease (2022)",
         "source_type": "recommendation",
         "collection": COLLECTION_RECOMMENDATIONS,
@@ -49,26 +52,29 @@ CORPUS = [
                                           # None here and let chunker extract grade per section
     },
     {
-        "filename": "statin-use-cvd-prevention-clinician-summary.pdf",
+        # TODO CONFIRM: filename/subfolder not yet verified against actual disk layout
+        "filename": "Guidelines/statin-use-cvd-prevention-clinician-summary.pdf",
         "document_name": "USPSTF Statin Use for Primary Prevention of CVD (2022)",
         "source_type": "recommendation",
         "collection": COLLECTION_RECOMMENDATIONS,
         "default_evidence_grade": None,
     },
     {
-            "filename": "atorvastatin-calcium-label.pdf",
-            "document_name": "DailyMed Atorvastatin Calcium Label",
-            "source_type": "drug_label",
-            "collection": COLLECTION_SAFETY_LABELS,
-            "label_version": "UNVERIFIED — set this explicitly once you confirm the label date",
-        },
+        # TODO CONFIRM: filename/subfolder not yet verified against actual disk layout
+        "filename": "MedicalLabels/atorvastatin-calcium-label.pdf",
+        "document_name": "DailyMed Atorvastatin Calcium Label",
+        "source_type": "drug_label",
+        "collection": COLLECTION_SAFETY_LABELS,
+        "label_version": "UNVERIFIED — set this explicitly once you confirm the label date",
+    },
     {
-            "filename": "atorvastatin-calcium-tablet-Nucare.pdf",
-            "document_name": "NuCare Atorvastatin Calcium Label",
-            "source_type": "drug_label",
-            "collection": COLLECTION_SAFETY_LABELS,
-            "label_version": "UNVERIFIED — set this explicitly once you confirm the label date",
-        }
+        # TODO CONFIRM: filename/subfolder not yet verified against actual disk layout
+        "filename": "MedicalLabels/atorvastatin-calcium-tablet-Nucare.pdf",
+        "document_name": "NuCare Atorvastatin Calcium Label",
+        "source_type": "drug_label",
+        "collection": COLLECTION_SAFETY_LABELS,
+        "label_version": "UNVERIFIED — set this explicitly once you confirm the label date",
+    },
 ]
 
 # ---------------------------------------------------------------------------
