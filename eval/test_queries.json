@@ -1,0 +1,31 @@
+{
+  "in_scope_single_source": [
+    {"id": "q1", "query": "Is a 45-year-old with no cardiovascular risk factors a candidate for aspirin?", "expected_collections": ["recommendations"]},
+    {"id": "q2", "query": "Should a 62-year-old with a 12% 10-year CVD risk score start low-dose aspirin?", "expected_collections": ["recommendations"]},
+    {"id": "q3", "query": "What does USPSTF say about aspirin and bleeding risk in adults over 60?", "expected_collections": ["recommendations"]},
+    {"id": "q4", "query": "At what age does USPSTF recommend against starting aspirin for primary prevention?", "expected_collections": ["recommendations"]},
+    {"id": "q5", "query": "What evidence grade did USPSTF assign to aspirin use in adults aged 40-59?", "expected_collections": ["recommendations"]},
+    {"id": "q6", "query": "Is a 50-year-old with an LDL of 150 and one cardiovascular risk factor a candidate for a statin?", "expected_collections": ["recommendations"]},
+    {"id": "q7", "query": "What is the recommended age range for statin use in primary prevention?", "expected_collections": ["recommendations"]},
+    {"id": "q8", "query": "What are the contraindications for atorvastatin?", "expected_collections": ["safety_labels"]},
+    {"id": "q9", "query": "What warnings does the atorvastatin label give about muscle-related side effects?", "expected_collections": ["safety_labels"]},
+    {"id": "q10", "query": "Is atorvastatin safe during pregnancy?", "expected_collections": ["safety_labels"]}
+  ],
+  "compound_dual_source": [
+    {"id": "q11", "query": "I'm 68, already on atorvastatin, and my doctor is considering aspirin for heart disease prevention. Is that safe, and am I a good candidate?", "expected_collections": ["recommendations", "safety_labels"]},
+    {"id": "q12", "query": "A 58-year-old with a 15% CVD risk score is being started on both a statin and aspirin. What should they know about eligibility and interactions?", "expected_collections": ["recommendations", "safety_labels"]},
+    {"id": "q13", "query": "Can someone on atorvastatin safely take aspirin, and is aspirin recommended for their age group?", "expected_collections": ["recommendations", "safety_labels"]}
+  ],
+  "ambiguous_expect_refusal": [
+    {"id": "q14", "query": "Does aspirin interact with clopidogrel?", "note": "clopidogrel not indexed"},
+    {"id": "q15", "query": "Is it safe to take atorvastatin with warfarin?", "note": "warfarin not indexed"},
+    {"id": "q16", "query": "What's the interaction between atorvastatin and grapefruit juice?", "note": "faithfulness trap - only answer if actually present in indexed label text"},
+    {"id": "q17", "query": "Should someone on ibuprofen also take low-dose aspirin?", "note": "ibuprofen not indexed"}
+  ],
+  "out_of_domain_expect_refusal": [
+    {"id": "q18", "query": "What's the recommended metformin dose for type 2 diabetes?"},
+    {"id": "q19", "query": "What are the guidelines for treating hypertension?"},
+    {"id": "q20", "query": "Is losartan safe to combine with a statin?"},
+    {"id": "q21", "query": "What's the USPSTF recommendation on breast cancer screening?"}
+  ]
+}
