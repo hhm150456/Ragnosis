@@ -125,3 +125,14 @@ CHUNK_OVERLAP_CHARS = 150
 EMBEDDING_BACKEND = "local"
 LOCAL_EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
 OPENAI_EMBEDDING_MODEL = "text-embedding-3-small"
+
+TOP_K_DEFAULT = 4
+HYBRID_ALPHA = 0.4
+GENERATION_BACKEND = "gemini"
+GENERATION_MODEL_ANTHROPIC = "REPLACE_WITH_YOUR_MODEL"   # e.g. check console.anthropic.com/docs
+GENERATION_MODEL_OPENAI = "REPLACE_WITH_YOUR_MODEL"       # e.g. check platform.openai.com/docs
+GENERATION_MODEL_GEMINI = "gemini-3.5-flash-lite"        # e.g. check ai.google.dev/gemini-api/docs/models
+
+GENERATION_TEMPERATURE = 0.0   # deterministic, minimizes drift from grounded text
+GENERATION_MAX_TOKENS = 1500
+HF_TOKEN = ""
