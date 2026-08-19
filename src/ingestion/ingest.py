@@ -6,7 +6,7 @@ For each document in config.CORPUS:
   2. Apply section-aware chunking based on source_type (chunker)
   3. Build metadata for every chunk (metadata)
   4. Embed all chunk texts (embeddings.Embedder)
-  5. Store into the correct Chroma collection (vectorstore.ChromaStore)
+  5. Store into the correct Supabase table (vectorstore.SupabaseStore)
 
 Also writes a human-readable audit log to data/processed/chunks_audit.json
 so chunk boundaries and metadata can be manually spot-checked before Day 2
@@ -24,20 +24,20 @@ from src.ingestion.pdf_parser import extract_pages
 from src.ingestion.chunker import chunk_document
 from src.ingestion.metadata import build_chunk_metadata
 from src.embeddings.embedder import Embedder
-from src.vectorstore.chroma_store import ChromaStore
+from src.vectorstore.supabase_store import SupabaseStore
 
 
 def run_ingestion() -> dict:
     """Runs the full ingestion pipeline. Returns a summary dict used by
     scripts/run_ingestion.py --report."""
 
-    store = ChromaStore()
+    store = SupabaseStore()
     embedder = Embedder()
 
     # Group corpus entries by target collection so each collection is rebuilt
     # exactly once, then populated by all documents assigned to it.
     collections_needed = {doc["collection"] for doc in CORPUS}
-    chroma_collections = {name: store.rebuild_collection(name) for name in collections_needed}
+    target_tables = {name: store.rebuild_collection(name) for name in collections_needed}
 
     audit_log: list[dict] = []
     summary = {"documents": [], "warnings": []}
@@ -86,7 +86,7 @@ def run_ingestion() -> dict:
         print(f"  {len(chunks)} chunks produced. Embedding...")
         embeddings_input = embedder.embed_texts(documents)
 
-        target_collection = chroma_collections[doc_config["collection"]]
+        target_collection = target_tables[doc_config["collection"]]
         store.add_chunks(
             collection=target_collection,
             ids=ids,

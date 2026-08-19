@@ -1,10 +1,10 @@
 """
-BM25 keyword index, built per Chroma collection.
+BM25 keyword index, built per Supabase table.
 
-Rebuilt in-memory from the collection's stored documents whenever a
-HybridRetriever needs it — fine at this corpus size (a few hundred chunks
-across 4 PDFs). If the corpus grows significantly, persist the tokenized
-corpus to disk instead of rebuilding on every process start.
+Rebuilt in-memory from the table's stored rows whenever a HybridRetriever
+needs it — fine at this corpus size (a few hundred chunks across 4 PDFs).
+If the corpus grows significantly, persist the tokenized corpus to disk
+instead of rebuilding on every process start.
 
 BM25 exists alongside semantic search specifically because drug names and
 numeric thresholds ("70 years old", "12% risk") are exactly what pure
@@ -31,15 +31,24 @@ class BM25CollectionIndex:
     bm25: BM25Okapi | None
 
     @classmethod
-    def from_chroma_collection(cls, collection) -> "BM25CollectionIndex":
-        data = collection.get(include=["documents", "metadatas"])
-        chunk_ids = data["ids"]
-        documents = data["documents"]
-        metadatas = data["metadatas"]
+    def from_supabase_table(cls, client, table_name: str) -> "BM25CollectionIndex":
+        """
+        Fetches every row's id/content/metadata from the given Supabase table
+        to build an in-memory BM25 index. `metadata` is the jsonb column
+        holding the full per-chunk metadata dict.
+        """
+        response = client.table(table_name).select("id,content,metadata").execute()
+        rows = response.data or []
+        return cls._build(
+            chunk_ids=[r["id"] for r in rows],
+            documents=[r["content"] for r in rows],
+            metadatas=[r.get("metadata") or {} for r in rows],
+        )
 
+    @classmethod
+    def _build(cls, chunk_ids: list[str], documents: list[str], metadatas: list[dict]) -> "BM25CollectionIndex":
         tokenized_corpus = [_tokenize(doc) for doc in documents]
         bm25 = BM25Okapi(tokenized_corpus) if tokenized_corpus else None
-
         return cls(chunk_ids=chunk_ids, documents=documents, metadatas=metadatas, bm25=bm25)
 
     def search(self, query: str, top_k: int) -> list[tuple[str, float, str, dict]]:
@@ -58,3 +67,4 @@ class BM25CollectionIndex:
             for i in ranked_indices
             if scores[i] > 0
         ]
+    

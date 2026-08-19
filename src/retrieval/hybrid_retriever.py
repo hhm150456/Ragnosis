@@ -2,10 +2,14 @@
 Day 2 — Hybrid retrieval layer.
 
 Combines BM25 keyword search with semantic (embedding) search over each
-Chroma collection independently, normalizes and merges the two score
-sources, and returns ranked, transparent results — with both raw and
-combined scores attached — so they can be displayed before generation,
-per the hackathon's "transparent chunk display" requirement.
+Supabase table independently, normalizes and merges the two score sources,
+and returns ranked, transparent results — with both raw and combined scores
+attached — so they can be displayed before generation, per the hackathon's
+"transparent chunk display" requirement.
+
+Backend: Supabase (Postgres + pgvector) only. Semantic search calls the
+match_recommendations / match_safety_labels RPC functions defined in
+sql/schema.sql; BM25 is built in-memory from each table's rows.
 
 Two entry points:
 - retrieve_single(query, collection_name, top_k)  -> chunks from ONE collection
@@ -23,10 +27,19 @@ from config import (
     COLLECTION_SAFETY_LABELS,
     TOP_K_DEFAULT,
     HYBRID_ALPHA,
+    RERANKER_ENABLED,
+    RERANK_POOL_SIZE,
 )
 from src.embeddings.embedder import Embedder
-from src.vectorstore.chroma_store import ChromaStore
+from src.vectorstore.supabase_store import SupabaseStore
 from src.retrieval.bm25_index import BM25CollectionIndex
+
+# Maps collection name -> the Supabase RPC function that searches it
+# (defined in sql/schema.sql).
+_SUPABASE_RPC_BY_COLLECTION = {
+    COLLECTION_RECOMMENDATIONS: "match_recommendations",
+    COLLECTION_SAFETY_LABELS: "match_safety_labels",
+}
 
 
 @dataclass
@@ -34,10 +47,11 @@ class RetrievedChunk:
     chunk_id: str
     text: str
     metadata: dict
-    semantic_score: float   # 0-1, min-max normalized within this query's candidate set
-    bm25_score: float       # 0-1, min-max normalized within this query's candidate set
-    combined_score: float   # weighted merge, used for final ranking
+    semantic_score: float          # 0-1, min-max normalized within this query's candidate set
+    bm25_score: float              # 0-1, min-max normalized within this query's candidate set
+    combined_score: float          # weighted BM25+semantic merge, used for pre-rerank ranking
     collection: str
+    rerank_score: float | None = None  # cross-encoder score; set only if RERANKER_ENABLED, else None
 
 
 class HybridRetriever:
@@ -47,14 +61,16 @@ class HybridRetriever:
                combined = alpha * semantic + (1 - alpha) * bm25
         """
         self.alpha = alpha
-        self.store = ChromaStore()
+        self.store = SupabaseStore()
         self.embedder = Embedder()
         self._bm25_indexes: dict[str, BM25CollectionIndex] = {}
 
     def _get_bm25_index(self, collection_name: str) -> BM25CollectionIndex:
         if collection_name not in self._bm25_indexes:
-            collection = self.store.get_collection(collection_name)
-            self._bm25_indexes[collection_name] = BM25CollectionIndex.from_chroma_collection(collection)
+            table_name = self.store.get_collection(collection_name)  # returns table name string
+            self._bm25_indexes[collection_name] = BM25CollectionIndex.from_supabase_table(
+                self.store.client, table_name
+            )
         return self._bm25_indexes[collection_name]
 
     def refresh_bm25_index(self, collection_name: str) -> None:
@@ -62,12 +78,29 @@ class HybridRetriever:
         chunks instead of serving a stale in-memory index."""
         self._bm25_indexes.pop(collection_name, None)
 
+    def _semantic_search(
+        self, query_embedding: list[float], collection_name: str, pool_size: int
+    ) -> dict[str, dict]:
+        """Returns {chunk_id: {"text": ..., "metadata": ..., "raw": similarity}}
+        via the collection's Supabase RPC function."""
+        rpc_name = _SUPABASE_RPC_BY_COLLECTION[collection_name]
+        response = self.store.client.rpc(
+            rpc_name, {"query_embedding": query_embedding, "match_count": pool_size}
+        ).execute()
+        candidates = {}
+        for row in response.data or []:
+            candidates[row["id"]] = {
+                "text": row["content"],
+                "metadata": row.get("metadata") or {},
+                "raw": row["similarity"],
+            }
+        return candidates
+
     def retrieve_single(
         self, query: str, collection_name: str, top_k: int = TOP_K_DEFAULT
     ) -> list[RetrievedChunk]:
-        collection = self.store.get_collection(collection_name)
-        total = collection.count()
-        if total == 0:
+        total = self.store.collection_stats(collection_name)["count"]
+        if not total:
             return []
 
         # Widen the candidate pool beyond top_k before merging, so a chunk
@@ -75,25 +108,9 @@ class HybridRetriever:
         # to surface once scores are combined.
         pool_size = min(max(top_k * 4, 10), total)
 
-        # --- semantic candidates ---
         query_embedding = self.embedder.embed_query(query)
-        semantic_results = collection.query(
-            query_embeddings=[query_embedding],
-            n_results=pool_size,
-            include=["documents", "metadatas", "distances"],
-        )
-        semantic_candidates: dict[str, dict] = {}
-        if semantic_results["ids"] and semantic_results["ids"][0]:
-            for cid, doc, meta, dist in zip(
-                semantic_results["ids"][0],
-                semantic_results["documents"][0],
-                semantic_results["metadatas"][0],
-                semantic_results["distances"][0],
-            ):
-                similarity = 1 - dist  # cosine distance -> similarity (collection uses hnsw:space=cosine)
-                semantic_candidates[cid] = {"text": doc, "metadata": meta, "raw": similarity}
+        semantic_candidates = self._semantic_search(query_embedding, collection_name, pool_size)
 
-        # --- bm25 candidates ---
         bm25_index = self._get_bm25_index(collection_name)
         bm25_hits = bm25_index.search(query, top_k=pool_size)
         bm25_candidates = {
@@ -128,6 +145,16 @@ class HybridRetriever:
             )
 
         merged.sort(key=lambda c: c.combined_score, reverse=True)
+
+        if RERANKER_ENABLED and merged:
+            from src.retrieval.reranker import rerank
+
+            # Rerank over a wider pool than the final top_k, so the
+            # cross-encoder gets a real chance to promote a chunk that
+            # scored lower on fusion but is actually the better match.
+            candidates_for_rerank = merged[:RERANK_POOL_SIZE]
+            return rerank(query, candidates_for_rerank, top_k)
+
         return merged[:top_k]
 
     def retrieve_compound(
