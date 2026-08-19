@@ -28,6 +28,14 @@ CHROMA_PERSIST_DIR.mkdir(parents=True, exist_ok=True)
 COLLECTION_RECOMMENDATIONS = "recommendations"   # USPSTF-style guidance docs
 COLLECTION_SAFETY_LABELS = "safety_labels"       # DailyMed / FDA label docs
 
+# Maps the internal collection name -> the actual Supabase table name, as
+# created by sql/schema.sql. Used by SupabaseStore (src/vectorstore/supabase_store.py)
+# and, transitively, by HybridRetriever.
+SUPABASE_TABLE_BY_COLLECTION = {
+    COLLECTION_RECOMMENDATIONS: "recommendations_chunks",
+    COLLECTION_SAFETY_LABELS: "safety_labels_chunks",
+}
+
 # ---------------------------------------------------------------------------
 # Fixed corpus definition
 # ---------------------------------------------------------------------------
@@ -128,6 +136,25 @@ OPENAI_EMBEDDING_MODEL = "text-embedding-3-small"
 
 TOP_K_DEFAULT = 4
 HYBRID_ALPHA = 0.4
+
+# ---------------------------------------------------------------------------
+# Safety (Day 4 — interim gate only, see src/safety/README.md)
+# ---------------------------------------------------------------------------
+# The full faithfulness/refusal-template layer is still future work. This is
+# just the cheapest, first piece: if the best retrieved chunk's combined
+# score falls below this, refuse before spending a generation call at all.
+# See src/safety/confidence.py.
+MIN_CONFIDENCE_THRESHOLD = 0.2
+
+# ---------------------------------------------------------------------------
+# Reranking (optional cross-encoder pass, see src/retrieval/reranker.py)
+# ---------------------------------------------------------------------------
+# Off by default: it pulls in an extra local model download/load on top of
+# the embedding model, which isn't worth it unless you've noticed fusion
+# ranking (BM25 + semantic) mis-ordering results for compound queries.
+RERANKER_ENABLED = False
+RERANK_POOL_SIZE = 20  # candidates handed to the cross-encoder before truncating to top_k
+RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 GENERATION_BACKEND = "gemini"
 GENERATION_MODEL_ANTHROPIC = "REPLACE_WITH_YOUR_MODEL"   # e.g. check console.anthropic.com/docs
 GENERATION_MODEL_OPENAI = "REPLACE_WITH_YOUR_MODEL"       # e.g. check platform.openai.com/docs
