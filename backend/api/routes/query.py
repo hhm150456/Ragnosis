@@ -86,7 +86,22 @@ def run_query(payload: QueryRequest) -> AnalyzeResponse:
         answer = generate_answer(query_text, retrieval_results)
     except Exception as exc:
         logger.exception("Generation failed for query=%r", query_text)
-        raise HTTPException(status_code=502, detail=f"Generation failed: {exc}") from exc
+        return AnalyzeResponse(
+            query=query_text,
+            status="full_refusal",
+            answer_summary=(
+                "The evidence was retrieved, but the answer service is temporarily "
+                "unavailable. No clinical conclusion was generated."
+            ),
+            refusal_reason=(
+                "Answer generation failed because the configured language-model "
+                f"provider returned an error: {exc}"
+            ),
+            recommendations=[],
+            dropped_claim_count=0,
+            retrieved_chunks=retrieved_chunks,
+            low_confidence=False,
+        )
 
     recommendations = [
         RecommendationOut(
