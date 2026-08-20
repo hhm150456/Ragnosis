@@ -15,8 +15,7 @@ from backend.src.retrieval.hybrid_retriever import RetrievedChunk
 from backend.src.generation.prompts import SYSTEM_PROMPT, build_user_prompt
 from backend.src.generation.llm_client import LLMClient
 from backend.src.generation.response_parser import parse_response, StructuredAnswer
-from backend.src.safety.faithfulness import verify_claim_faithfulness
-from concurrent.futures import ThreadPoolExecutor
+from backend.src.safety.faithfulness import verify_claims_faithfulness
 
 
 def generate_answer(
@@ -65,15 +64,15 @@ def generate_answer(
     if not answer.recommendations:
         return answer
 
-    def verify_recommendation(recommendation):
-        cited_chunk = chunks_by_id[recommendation.citation.chunk_id]
-        return recommendation, verify_claim_faithfulness(
-            recommendation.claim, cited_chunk.text, client
-        )
-
     unsupported_reasons: list[str] = []
-    with ThreadPoolExecutor(max_workers=min(4, len(answer.recommendations))) as executor:
-        verifications = executor.map(verify_recommendation, answer.recommendations)
+    claims = [
+        (
+            recommendation.claim,
+            chunks_by_id[recommendation.citation.chunk_id].text,
+        )
+        for recommendation in answer.recommendations
+    ]
+    verifications = zip(answer.recommendations, verify_claims_faithfulness(claims, client))
 
     for recommendation, verification in verifications:
         recommendation.faithfulness_status = (
