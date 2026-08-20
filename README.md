@@ -1,89 +1,208 @@
-# Clinical RAG — Contraindication & Drug-Interaction Checker
+# Ragnosis
 
-A Retrieval-Augmented Generation system for aspirin/statin preventive-medication
-eligibility (USPSTF) and atorvastatin drug safety (DailyMed), with strict grounding,
-transparent citations, and refusal on out-of-scope queries.
+Clinical evidence assistant for preventive-care eligibility and drug-safety questions.
 
-## Repo Structure
+This repository combines a Python FastAPI backend with a React + Vite frontend to provide grounded answers over a curated clinical corpus. The app is designed around evidence-backed responses for aspirin/statin preventive medication questions and atorvastatin safety queries, with retrieval transparency and refusals when confidence is too low.
 
-```
-clinical-rag/
+## What this repo contains
+
+- Backend API in `backend/`
+- Clinical retrieval, generation, and safety logic in `backend/src/`
+- Frontend dashboard and evidence UI in `frontend/src/`
+- Ingestion and evaluation assets in `data/` and `eval/`
+- Supabase schema in `backend/sql/schema.sql`
+
+## High-level architecture
+
+- `backend/api/main.py` exposes the FastAPI app and CORS setup
+- `backend/api/routes/query.py` handles the main evidence query pipeline
+- `backend/api/routes/sources.py` returns corpus metadata for the Sources page
+- `backend/api/routes/evaluation.py` runs and returns evaluation summaries
+- `backend/src/retrieval/` contains hybrid retrieval logic (BM25 + semantic)
+- `backend/src/generation/` handles the LLM response and grounding validation
+- `backend/src/safety/` filters low-confidence or invalid queries before generation
+- `frontend/` is the React interface for dashboard, evidence review, sources, and evaluation
+
+## Repository structure
+
+```text
+Ragnosis/
 ├── README.md
-├── requirements.txt
-├── .env.example
-├── config.py                     # corpus config: file paths, source_type mapping, chunking rules
-│
+├── backend/
+│   ├── api/
+│   │   ├── deps.py
+│   │   ├── main.py
+│   │   ├── schemas.py
+│   │   └── routes/
+│   │       ├── evaluation.py
+│   │       ├── query.py
+│   │       └── sources.py
+│   ├── config.py
+│   ├── requirements.txt
+│   ├── scripts/
+│   │   ├── query_answer.py
+│   │   ├── query_retrieval.py
+│   │   └── run_ingestion.py
+│   ├── sql/
+│   │   └── schema.sql
+│   └── src/
+│       ├── embeddings/
+│       ├── generation/
+│       ├── ingestion/
+│       ├── retrieval/
+│       ├── safety/
+│       └── vectorstore/
 ├── data/
-│   ├── raw/                      # put source PDFs here (see config.py for expected filenames)
-│   └── processed/                # output of ingestion: chunked JSON + logs (gitignored)
-│
-├── src/
-│   ├── ingestion/
-│   │   ├── pdf_parser.py         # PyMuPDF text+layout extraction, per-page
-│   │   ├── chunker.py            # section-aware chunking (USPSTF vs DailyMed rules)
-│   │   ├── metadata.py           # builds per-chunk metadata dict
-│   │   └── ingest.py             # orchestrates parse -> chunk -> embed -> store
-│   │
-│   ├── embeddings/
-│   │   └── embedder.py           # local embedding model wrapper (bge-small-en-v1.5)
-│   │
-│   ├── vectorstore/
-│   │   └── chroma_store.py       # two Chroma collections: recommendations / safety_labels
-│   │
-│   ├── retrieval/                # Day 2 — hybrid BM25 + semantic retrieval
-│   ├── generation/                # Day 3 — grounded generation + citation formatting
-│   └── safety/                    # Day 4 — confidence threshold + faithfulness check
-│
+│   ├── chroma_db/
+│   ├── processed/
+│   └── raw/
 ├── eval/
-│   └── test_queries.json         # labeled eval set (in-scope / ambiguous / out-of-domain)
-│
-├── app/
-│   └── streamlit_app.py          # Day 5 demo UI (placeholder)
-│
-└── scripts/
-    └── run_ingestion.py          # CLI entrypoint for Day 1
+│   └── test_queries.json
+├── frontend/
+│   ├── package.json
+│   ├── src/
+│   ├── vite.config.ts
+│   └── ...
+└── .gitignore
 ```
 
-## Day 1 Quickstart
+## Core capabilities
 
-1. Place the three source PDFs into `data/raw/` using the filenames listed in `config.py`:
-   - `uspstf_aspirin.pdf`
-   - `uspstf_statin.pdf`
-   - `dailymed_atorvastatin.pdf`
+- Query a curated clinical corpus with hybrid retrieval
+- Combine evidence from recommendation and safety-label sources
+- Refuse unsupported or low-confidence queries
+- Show retrieved chunks and source context to the user
+- Display structured evaluation and evidence coverage in the UI
 
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt --break-system-packages
-   ```
+## Prerequisites
 
-3. Run ingestion:
-   ```bash
-   python scripts/run_ingestion.py
-   ```
+Before running the app locally, make sure you have:
 
-   This will:
-   - Parse each PDF page-by-page with PyMuPDF
-   - Apply section-aware chunking rules based on `source_type` (recommendation vs drug_label)
-   - Attach metadata (document_name, source_type, section_title, page_number, evidence_grade / label_version)
-   - Embed each chunk locally with `bge-small-en-v1.5`
-   - Store into two separate persistent Chroma collections: `recommendations` and `safety_labels`
-   - Write a chunk audit log to `data/processed/chunks_audit.json` so you can manually verify
-     chunk boundaries and metadata before Day 2 retrieval tuning
+- Python 3.11+
+- Node.js 18+
+- A Supabase project configured for vector storage
+- A valid LLM provider API key (Gemini, OpenAI, or Anthropic), depending on your selected generation backend
 
-4. Sanity check the output:
-   ```bash
-   python scripts/run_ingestion.py --report
-   ```
-   Prints chunk counts per collection, per source document, and flags any chunk with
-   missing page/section metadata (these should be fixed before Day 2).
+## Environment setup
 
-## Design Notes
+Create a `.env` file in the backend directory with the variables required by the project. The app reads configuration from `backend/config.py`, which loads environment variables via `python-dotenv`.
 
-- **Two collections, not one.** USPSTF recommendation PDFs and DailyMed FDA labels have
-  different internal structure, so they get different chunking rules and are queried/reasoned
-  about separately by the generation layer later (see project problem statement).
-- **Local embeddings by default.** `bge-small-en-v1.5` runs fully offline via
-  `sentence-transformers` — no API dependency for retrieval, which matters for demo reliability
-  on Day 5. Swap to OpenAI `text-embedding-3-small` in `config.py` if you want to compare quality.
-- **Everything is re-runnable and idempotent.** Re-running ingestion clears and rebuilds the
-  named collections rather than appending duplicates.
+At minimum, expected values include:
+
+```env
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# choose the generation backend you want to use
+GENERATION_BACKEND=gemini
+GEMINI_API_KEY=your_gemini_key
+
+# optional if you are using OpenAI or Anthropic instead
+# OPENAI_API_KEY=your_openai_key
+# ANTHROPIC_API_KEY=your_anthropic_key
+```
+
+For the retrieval/vector pipeline, make sure the schema in `backend/sql/schema.sql` has already been run in your Supabase SQL editor and that the tables match the collection names configured in `backend/config.py`.
+
+## Backend setup
+
+From the repository root:
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate   # macOS/Linux
+# or on Windows PowerShell:
+# .\.venv\Scripts\Activate.ps1
+
+pip install -r requirements.txt
+```
+
+Start the API:
+
+```bash
+cd backend
+python -m uvicorn backend.api.main:app --reload --port 8000
+```
+
+The app will be available at:
+
+- API: http://localhost:8000
+- Swagger docs: http://localhost:8000/docs
+- Health check: http://localhost:8000/health
+
+## Frontend setup
+
+From the repo root:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The frontend typically runs at:
+
+- http://localhost:5173
+
+If the backend is not on the default host/port, set a Vite environment variable such as:
+
+```env
+VITE_API_BASE_URL=http://localhost:8000
+```
+
+## Recommended workflow
+
+1. Configure Supabase and `.env` values
+2. Run the SQL schema setup in `backend/sql/schema.sql`
+3. Start the backend API
+4. Start the frontend dev server
+5. Test the query flow in the UI and inspect retrieval/transparency data
+
+## Ingestion and evaluation
+
+The backend includes scripts for ingestion and retrieval testing.
+
+Run ingestion:
+
+```bash
+cd backend
+python scripts/run_ingestion.py
+```
+
+Run a retrieval-only sanity check:
+
+```bash
+cd backend
+python scripts/query_retrieval.py
+```
+
+Run an answer-generation check:
+
+```bash
+cd backend
+python scripts/query_answer.py
+```
+
+The evaluation suite is located under `eval/test_queries.json` and is used by the `/api/evaluation` endpoints.
+
+## Notes on the current implementation
+
+- The project uses a fixed clinical corpus defined in `backend/config.py`
+- Retrieval is split across recommendation and safety-label collections
+- The backend intentionally blocks low-confidence or invalid inputs before generation
+- The frontend is built to surface evidence, citations, and coverage for transparency
+
+## Troubleshooting
+
+If the app does not start correctly, check the following:
+
+- `.env` values are present and loaded correctly
+- Supabase variables match your project
+- The SQL schema was applied to Supabase
+- The selected LLM provider key is valid
+- The frontend is pointing to the correct backend URL
+
+## License
+
+This project is intended for internal research and clinical evidence tooling. Use the code according to your project requirements and applicable licensing constraints.
