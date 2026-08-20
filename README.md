@@ -9,7 +9,7 @@ This repository combines a Python FastAPI backend with a React + Vite frontend t
 - Backend API in `backend/`
 - Clinical retrieval, generation, and safety logic in `backend/src/`
 - Frontend dashboard and evidence UI in `frontend/src/`
-- Ingestion and evaluation assets in `data/` and `eval/`
+- Ingestion and evaluation assets in `backend/data/` and `backend/eval/`
 - Supabase schema in `backend/sql/schema.sql`
 
 ## High-level architecture
@@ -52,12 +52,12 @@ Ragnosis/
 │       ├── retrieval/
 │       ├── safety/
 │       └── vectorstore/
-├── data/
-│   ├── chroma_db/
-│   ├── processed/
-│   └── raw/
-├── eval/
-│   └── test_queries.json
+│   ├── data/
+│   │   ├── chroma_db/
+│   │   ├── processed/
+│   │   └── raw/
+│   └── eval/
+│       └── test_queries.json
 ├── frontend/
 │   ├── package.json
 │   ├── src/
@@ -106,22 +106,19 @@ For the retrieval/vector pipeline, make sure the schema in `backend/sql/schema.s
 
 ## Backend setup
 
-From the repository root:
+From the repository root, create the virtual environment in `.venv`:
 
 ```bash
-cd backend
 python -m venv .venv
-source .venv/bin/activate   # macOS/Linux
-# or on Windows PowerShell:
-# .\.venv\Scripts\Activate.ps1
+source .venv/bin/activate       # macOS/Linux
+\.\.venv\Scripts\Activate.ps1 # Windows PowerShell
 
-pip install -r requirements.txt
+pip install -r backend/requirements.txt
 ```
 
 Start the API:
 
 ```bash
-cd backend
 python -m uvicorn backend.api.main:app --reload --port 8000
 ```
 
@@ -145,7 +142,7 @@ The frontend typically runs at:
 
 - http://localhost:5173
 
-If the backend is not on the default host/port, set a Vite environment variable such as:
+If the backend is not on the default host/port, create `frontend/.env.local` with:
 
 ```env
 VITE_API_BASE_URL=http://localhost:8000
@@ -153,7 +150,7 @@ VITE_API_BASE_URL=http://localhost:8000
 
 ## Recommended workflow
 
-1. Configure Supabase and `.env` values
+1. Configure Supabase and `backend/.env` values
 2. Run the SQL schema setup in `backend/sql/schema.sql`
 3. Start the backend API
 4. Start the frontend dev server
@@ -184,11 +181,21 @@ cd backend
 python scripts/query_answer.py
 ```
 
-The evaluation suite is located under `eval/test_queries.json` and is used by the `/api/evaluation` endpoints.
+The evaluation suite is located at `backend/eval/test_queries.json` and is used by the `/api/evaluation` endpoints.
+
+## Frontend checks
+
+Run these commands from `frontend/`:
+
+```bash
+npm run lint
+npm run typecheck
+npm run build
+```
 
 ## Notes on the current implementation
 
-- The project uses a fixed clinical corpus defined in `backend/config.py`
+- The project uses a fixed clinical corpus defined in `backend/config.py`; source PDFs belong under `backend/data/raw/`
 - Retrieval is split across recommendation and safety-label collections
 - The backend intentionally blocks low-confidence or invalid inputs before generation
 - The frontend is built to surface evidence, citations, and coverage for transparency
