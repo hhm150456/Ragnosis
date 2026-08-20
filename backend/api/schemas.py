@@ -65,6 +65,8 @@ class RecommendationOut(BaseModel):
     claim: str
     excerpt: str
     evidence_grade: str | None = None
+    faithfulness_status: Literal["verified", "unverified"] = "unverified"
+    verification_reason: str | None = None
     citation: CitationOut
 
 
@@ -108,7 +110,7 @@ class AnalyzeResponse(BaseModel):
     low_confidence: bool = Field(
         default=False,
         description=(
-            "True if the interim safety confidence gate (src/safety/confidence.py) "
+            "True if the safety confidence gate (src/safety/confidence.py) "
             "short-circuited before a generation call was made."
         ),
     )

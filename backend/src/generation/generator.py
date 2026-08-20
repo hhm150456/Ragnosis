@@ -15,6 +15,8 @@ from backend.src.retrieval.hybrid_retriever import RetrievedChunk
 from backend.src.generation.prompts import SYSTEM_PROMPT, build_user_prompt
 from backend.src.generation.llm_client import LLMClient
 from backend.src.generation.response_parser import parse_response, StructuredAnswer
+from backend.src.safety.faithfulness import verify_claim_faithfulness
+from concurrent.futures import ThreadPoolExecutor
 
 
 def generate_answer(
@@ -59,7 +61,40 @@ def generate_answer(
     user_prompt = build_user_prompt(query, retrieval_results)
     raw_response = client.generate(SYSTEM_PROMPT, user_prompt)
 
-    return parse_response(raw_response, chunks_by_id)
+    answer = parse_response(raw_response, chunks_by_id)
+    if not answer.recommendations:
+        return answer
+
+    def verify_recommendation(recommendation):
+        cited_chunk = chunks_by_id[recommendation.citation.chunk_id]
+        return recommendation, verify_claim_faithfulness(
+            recommendation.claim, cited_chunk.text, client
+        )
+
+    unsupported_reasons: list[str] = []
+    with ThreadPoolExecutor(max_workers=min(4, len(answer.recommendations))) as executor:
+        verifications = executor.map(verify_recommendation, answer.recommendations)
+
+    for recommendation, verification in verifications:
+        recommendation.faithfulness_status = (
+            "verified" if verification.supported else "unverified"
+        )
+        recommendation.verification_reason = verification.reason
+        if not verification.supported and verification.verification_available:
+            unsupported_reasons.append(
+                f"Claim '{recommendation.claim}' was not supported by its cited evidence: "
+                f"{verification.reason}"
+            )
+
+    if unsupported_reasons and answer.status == "answered":
+        answer.status = "partial_refusal"
+        answer.refusal_reason = " ".join(unsupported_reasons)
+    elif unsupported_reasons:
+        answer.refusal_reason = " ".join(
+            part for part in [answer.refusal_reason, *unsupported_reasons] if part
+        )
+
+    return answer
 
 
 def format_answer_for_display(answer: StructuredAnswer) -> str:
@@ -97,6 +132,14 @@ def format_answer_for_display(answer: StructuredAnswer) -> str:
         lines.append(
             f"\n[NOTE: {answer.dropped_claim_count} claim(s) were discarded because they cited "
             f"an invalid or unretrieved source and could not be verified.]"
+        )
+
+    unverified_count = sum(
+        rec.faithfulness_status == "unverified" for rec in answer.recommendations
+    )
+    if unverified_count:
+        lines.append(
+            f"\n[WARNING: {unverified_count} claim(s) were not verified against their cited text.]"
         )
 
     return "\n".join(lines)

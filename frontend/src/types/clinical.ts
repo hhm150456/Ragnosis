@@ -1,4 +1,4 @@
-// ClinGuard clinical data structures.
+// Ragnosis clinical data structures.
 // These types model the structured result objects that a future
 // POST /analyze backend would return. The frontend only ever
 // consumes these shapes — clinical logic lives in the service layer.
@@ -80,6 +80,13 @@ export interface RetrievalTrace {
   note: string;
 }
 
+export interface GroundedClaim {
+  claim: string;
+  excerpt: string;
+  faithfulnessStatus: 'verified' | 'unverified';
+  verificationReason?: string;
+}
+
 export interface MultiSourceEntry {
   organization: string;
   title: string;
@@ -94,6 +101,7 @@ export interface ClinicalResult {
   status: ResultStatus;
   queryUnderstanding?: QueryUnderstanding;
   answer?: string;
+  claims?: GroundedClaim[];
   answerDisclaimer?: string;
   evidenceGrade?: string;
   coverage?: EvidenceCoverage;

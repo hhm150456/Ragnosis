@@ -48,6 +48,34 @@ export function RefusalPanel({ result }: { result: ClinicalResult }) {
         <p className="text-sm leading-relaxed text-slate-300">
           {result.refusalReason}
         </p>
+
+        {result.claims?.length ? (
+          <div className="mt-5 space-y-3">
+            <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Claim verification
+            </div>
+            {result.claims.map((claim) => (
+              <div
+                key={claim.claim}
+                className={`rounded-lg border p-3 ${
+                  claim.faithfulnessStatus === 'verified'
+                    ? 'border-emerald-500/20 bg-emerald-500/5'
+                    : 'border-amber-500/30 bg-amber-500/10'
+                }`}
+              >
+                <div className="flex items-start gap-2 text-sm text-slate-200">
+                  <span className="font-semibold">
+                    {claim.faithfulnessStatus === 'verified' ? 'Verified' : 'Unverified'}
+                  </span>
+                  <span>{claim.claim}</span>
+                </div>
+                {claim.faithfulnessStatus === 'unverified' && claim.verificationReason && (
+                  <p className="mt-2 text-xs text-amber-200">{claim.verificationReason}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {/* Evidence check */}

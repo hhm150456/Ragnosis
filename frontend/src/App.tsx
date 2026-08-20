@@ -44,7 +44,9 @@ function App() {
         <TopBar title={PAGE_TITLES[page]} onOpenMobileMenu={() => setMobileOpen(true)} />
 
         <main className="mx-auto max-w-5xl px-4 py-6 lg:px-8 lg:py-10">
-          {page === 'dashboard' && <Dashboard onNavigate={handleHeroSubmit} />}
+          {page === 'dashboard' && (
+            <Dashboard onNavigate={navigate} onQuery={handleHeroSubmit} />
+          )}
           {page === 'evidence' && (
             <EvidenceChecker
               initialQuery={pendingQuery}

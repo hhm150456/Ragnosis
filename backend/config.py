@@ -11,10 +11,13 @@ This is the single source of truth for:
 
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / ".env")
 RAW_DIR = BASE_DIR / "data" / "raw"
 PROCESSED_DIR = BASE_DIR / "data" / "processed"
 CHROMA_PERSIST_DIR = BASE_DIR / "data" / "chroma_db"
@@ -144,7 +147,7 @@ HYBRID_ALPHA = 0.4
 # just the cheapest, first piece: if the best retrieved chunk's combined
 # score falls below this, refuse before spending a generation call at all.
 # See src/safety/confidence.py.
-MIN_CONFIDENCE_THRESHOLD = 0.2
+MIN_CONFIDENCE_THRESHOLD = 0.15
 
 # ---------------------------------------------------------------------------
 # Reranking (optional cross-encoder pass, see src/retrieval/reranker.py)
@@ -161,5 +164,7 @@ GENERATION_MODEL_OPENAI = "REPLACE_WITH_YOUR_MODEL"       # e.g. check platform.
 GENERATION_MODEL_GEMINI = "gemini-3.5-flash-lite"        # e.g. check ai.google.dev/gemini-api/docs/models
 
 GENERATION_TEMPERATURE = 0.0   # deterministic, minimizes drift from grounded text
-GENERATION_MAX_TOKENS = 1500
+# Responses are a small structured JSON object; a large completion budget adds
+# latency without improving grounded answers.
+GENERATION_MAX_TOKENS = 700
 HF_TOKEN = ""

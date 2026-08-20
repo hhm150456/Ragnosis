@@ -3,7 +3,7 @@ FastAPI entrypoint for the Ragnosis Clinical RAG API.
 
 Run from the repository root with:
 
-    uvicorn backend.api.main:app --reload --port 8000
+    .venv/Scripts/python.exe -m uvicorn backend.api.main:app --reload --port 8000
 
 Endpoints:
 
@@ -76,6 +76,16 @@ app.add_middleware(
 app.include_router(query.router, prefix="/api")
 app.include_router(sources.router, prefix="/api")
 app.include_router(evaluation.router, prefix="/api")
+
+
+@app.get("/")
+def root() -> dict[str, str]:
+    return {
+        "name": "Ragnosis Clinical RAG API",
+        "status": "ok",
+        "docs": "/docs",
+        "health": "/health",
+    }
 
 
 @app.get("/health", response_model=HealthResponse)

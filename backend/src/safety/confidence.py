@@ -1,12 +1,9 @@
 """
-Day 4 (interim) — minimal retrieval-confidence gate.
+Pre-generation retrieval-confidence gate.
 
-The full safety layer planned in this package's README (retrieval
-confidence threshold, unsupported-claim/faithfulness check, refusal
-template) isn't built yet. This module is just the first, cheapest piece of
-that: if the best-scoring retrieved chunk is clearly weak, refuse before
-spending a generation call on it at all, rather than letting a low-quality
-match get sent to the LLM and hoping it declines gracefully.
+If the best-scoring retrieved chunk is clearly weak, refuse before spending a
+generation call on it at all, rather than letting a low-quality match get
+sent to the LLM and hoping it declines gracefully.
 
 This is intentionally conservative and narrow:
 - It only ever refuses; it never overrides generation with an answer.
@@ -27,6 +24,18 @@ from __future__ import annotations
 from config import MIN_CONFIDENCE_THRESHOLD
 
 
+def invalid_query_reason(query: str) -> str | None:
+    """Return a refusal reason for input too weak to search reliably."""
+    words = [word for word in query.split() if any(character.isalnum() for character in word)]
+    if not words or not any(sum(character.isalpha() for character in word) >= 2 for word in words):
+        return (
+            "The query is too short or contains insufficient clinical language "
+            "to search the evidence corpus. Please enter a medication, condition, "
+            "or clinical question."
+        )
+    return None
+
+
 def low_confidence_reason(retrieval_results: dict[str, list]) -> str | None:
     """
     retrieval_results: output of HybridRetriever.retrieve_compound(), keyed
@@ -39,6 +48,8 @@ def low_confidence_reason(retrieval_results: dict[str, list]) -> str | None:
     if not all_chunks:
         return None
 
+    # combined_score is the stable score calibrated against the configured
+    # threshold. rerank_score may be an unbounded model-specific logit.
     best_score = max(chunk.combined_score for chunk in all_chunks)
     if best_score < MIN_CONFIDENCE_THRESHOLD:
         return (

@@ -26,9 +26,9 @@ export function About() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-white sm:text-3xl">About ClinGuard</h1>
+        <h1 className="text-2xl font-bold text-white sm:text-3xl">About Ragnosis</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300">
-          ClinGuard is a research prototype exploring evidence-grounded clinical retrieval and
+          Ragnosis is a research prototype exploring evidence-grounded clinical retrieval and
           controlled refusal.
         </p>
       </div>
@@ -60,7 +60,7 @@ export function About() {
         <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-5">
           <h3 className="text-sm font-semibold text-white">Design Philosophy</h3>
           <p className="mt-2 text-xs leading-relaxed text-slate-400">
-            ClinGuard intentionally keeps its evidence corpus narrow to prioritize retrieval
+            Ragnosis intentionally keeps its evidence corpus narrow to prioritize retrieval
             precision, source traceability, and clinical safety.
           </p>
         </div>

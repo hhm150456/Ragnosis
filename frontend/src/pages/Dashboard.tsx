@@ -1,20 +1,21 @@
 import { Search, FileCheck, ShieldAlert, ArrowRight, Check, X } from 'lucide-react';
-import { useState } from 'react';
 import { QueryInput } from '@/components/QueryInput';
 import { ExampleQuery } from '@/components/ExampleQuery';
 import { Workflow } from '@/components/Workflow';
-import { Disclaimer } from '@/components/Disclaimer';
 import { EXAMPLE_QUERIES } from '@/data/mockData';
 import type { PageId } from '@/components/Sidebar';
 
 const HERO_EXAMPLES = EXAMPLE_QUERIES.slice(0, 4);
 
-export function Dashboard({ onNavigate }: { onNavigate: (page: PageId) => void }) {
-  const [pendingQuery, setPendingQuery] = useState<string | undefined>();
-
+export function Dashboard({
+  onNavigate,
+  onQuery,
+}: {
+  onNavigate: (page: PageId) => void;
+  onQuery: (query: string) => void;
+}) {
   const handleSubmit = (query: string) => {
-    setPendingQuery(query);
-    onNavigate('evidence');
+    onQuery(query);
   };
 
   return (
@@ -29,7 +30,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId) => void }
             Clinical evidence, not clinical guesses.
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-base text-slate-400">
-            ClinGuard retrieves evidence from a controlled clinical corpus, verifies whether
+            Ragnosis retrieves evidence from a controlled clinical corpus, verifies whether
             the available evidence is sufficient, and blocks unsupported clinical claims.
           </p>
         </div>
@@ -44,7 +45,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId) => void }
               Enter a clinical question → Check evidence → Get a grounded result
             </p>
             <button
-              onClick={() => setPendingQuery(EXAMPLE_QUERIES[0].query)}
+              onClick={() => handleSubmit(EXAMPLE_QUERIES[0].query)}
               className="text-xs font-medium text-sky-400 hover:text-sky-300"
             >
               Try an example →
@@ -67,10 +68,10 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId) => void }
       <section className="rounded-2xl border border-red-500/20 bg-slate-800/20 p-6 sm:p-10">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-white sm:text-3xl">
-            When the evidence isn't enough, ClinGuard stops.
+            When the evidence isn't enough, Ragnosis stops.
           </h2>
           <p className="mx-auto mt-3 max-w-2xl text-sm text-slate-400">
-            ClinGuard does not fill evidence gaps with unsupported medical knowledge. If the
+            Ragnosis does not fill evidence gaps with unsupported medical knowledge. If the
             required evidence cannot be found in the controlled corpus, answer generation is blocked.
           </p>
         </div>
@@ -86,10 +87,10 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId) => void }
             </p>
           </div>
 
-          {/* ClinGuard response */}
+          {/* Ragnosis response */}
           <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-5">
             <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-red-400">
-              <ShieldAlert className="h-4 w-4" /> ClinGuard
+              <ShieldAlert className="h-4 w-4" /> Ragnosis
             </div>
             <div className="mt-2 text-sm font-bold text-red-200">
               ⚠ INSUFFICIENT EVIDENCE
@@ -142,7 +143,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId) => void }
         </div>
       </section>
 
-      {/* Why ClinGuard */}
+      {/* Why Ragnosis */}
       <section>
         <h2 className="text-center text-xl font-semibold text-white sm:text-2xl">
           Built for evidence boundaries.
@@ -150,15 +151,15 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId) => void }
         <div className="mx-auto mt-6 max-w-3xl space-y-3">
           <CompareRow
             general="May rely on broader model knowledge."
-            clinguard="Uses a controlled evidence corpus."
+            ragnosis="Uses a controlled evidence corpus."
           />
           <CompareRow
             general="Evidence paths may not always be explicit."
-            clinguard="Shows source, section, page, and retrieval trace."
+            ragnosis="Shows source, section, page, and retrieval trace."
           />
           <CompareRow
             general="May attempt to answer uncertain questions."
-            clinguard="Uses controlled refusal when evidence is insufficient."
+            ragnosis="Uses controlled refusal when evidence is insufficient."
           />
         </div>
       </section>
@@ -166,7 +167,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId) => void }
       {/* Brand message */}
       <section className="text-center">
         <h2 className="mx-auto max-w-3xl text-2xl font-bold text-white sm:text-3xl">
-          ClinGuard doesn't just answer. It checks whether the evidence is sufficient to answer.
+          Ragnosis doesn't just answer. It checks whether the evidence is sufficient to answer.
         </h2>
       </section>
 
@@ -189,7 +190,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageId) => void }
       {/* Footer */}
       <footer className="pb-4">
         <p className="text-center text-xs text-slate-500">
-          ClinGuard is a research demonstration and does not replace professional medical judgment.
+          Ragnosis is a research demonstration and does not replace professional medical judgment.
         </p>
       </footer>
     </div>
@@ -216,7 +217,7 @@ function CapabilityCard({
   );
 }
 
-function CompareRow({ general, clinguard }: { general: string; clinguard: string }) {
+function CompareRow({ general, ragnosis }: { general: string; ragnosis: string }) {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <div className="rounded-lg border border-slate-700/40 bg-slate-800/30 p-4">
@@ -227,9 +228,9 @@ function CompareRow({ general, clinguard }: { general: string; clinguard: string
       </div>
       <div className="rounded-lg border border-sky-500/20 bg-sky-500/5 p-4">
         <div className="text-[10px] font-semibold uppercase tracking-wider text-sky-400">
-          ClinGuard
+          Ragnosis
         </div>
-        <p className="mt-1 text-sm text-slate-200">{clinguard}</p>
+        <p className="mt-1 text-sm text-slate-200">{ragnosis}</p>
       </div>
     </div>
   );

@@ -5,6 +5,9 @@ import type {
   ResultStatus,
   RetrievalChunkRef,
   SourceType,
+  GroundedClaim,
+  QueryUnderstanding,
+  EvidenceCoverage,
 } from '@/types/clinical';
 
 // ---------------------------------------------------------------------------
@@ -13,7 +16,7 @@ import type {
 // ---------------------------------------------------------------------------
 
 const API_BASE_URL =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:8000';
+  (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '';
 
 // --- Wire-format types, mirroring backend/api/schemas.py exactly ----------
 // Keep these in sync with schemas.py by hand; there's no shared codegen yet.
@@ -32,6 +35,8 @@ interface RecommendationOut {
   claim: string;
   excerpt: string;
   evidence_grade: string | null;
+  faithfulness_status: 'verified' | 'unverified';
+  verification_reason: string | null;
   citation: CitationOut;
 }
 
@@ -94,6 +99,80 @@ function collectionMeta(collection: string) {
 function firstPageNumber(pageNumbers: string): number | undefined {
   const match = pageNumbers.match(/\d+/);
   return match ? Number(match[0]) : undefined;
+}
+
+function deriveQueryUnderstanding(query: string): QueryUnderstanding {
+  const normalized = query.toLowerCase();
+  const medications = ['atorvastatin', 'aspirin', 'statin'].filter((name) =>
+    normalized.includes(name),
+  );
+  const ageMatch = normalized.match(/\b(\d{2,3})[- ]year[- ]old\b/);
+  const interaction = normalized.match(/\b(?:with|and|interact(?:ion)? between)\s+([a-z-]+)/)?.[1];
+
+  return {
+    medication: medications.length ? medications.join(', ') : undefined,
+    intent: normalized.includes('interact') || normalized.includes('safety')
+      ? 'Safety / interaction'
+      : normalized.includes('eligible') || normalized.includes('prevent') || normalized.includes('start')
+        ? 'Preventive medication eligibility'
+        : 'Clinical evidence question',
+    population: ageMatch ? `${ageMatch[1]}-year-old` : undefined,
+    age: ageMatch?.[1],
+    interaction,
+  };
+}
+
+function deriveCoverage(response: AnalyzeResponse): EvidenceCoverage {
+  const collections = new Set(response.retrieved_chunks.map((chunk) => chunk.collection));
+  const citedChunkIds = new Set(response.recommendations.map((recommendation) => recommendation.citation.chunk_id));
+  const hasRetrievedEvidence = response.retrieved_chunks.length > 0;
+  const hasCitedEvidence = citedChunkIds.size > 0;
+  const hasVerifiedClaims =
+    response.recommendations.length > 0 &&
+    response.recommendations.every(
+      (recommendation) => recommendation.faithfulness_status === 'verified',
+    );
+  const items = [
+    {
+      label: 'Relevant source material retrieved',
+      found: hasRetrievedEvidence,
+      note: hasRetrievedEvidence ? `${response.retrieved_chunks.length} chunk(s)` : 'No chunks returned',
+    },
+    {
+      label: 'Evidence cited in the result',
+      found: hasCitedEvidence,
+      note: hasCitedEvidence ? `${citedChunkIds.size} citation(s)` : 'No grounded claims',
+    },
+    {
+      label: 'Claims verified against cited text',
+      found: hasVerifiedClaims,
+      note:
+        response.recommendations.length === 0
+          ? 'No claims generated'
+          : hasVerifiedClaims
+            ? 'All claims verified'
+            : 'One or more claims failed verification',
+    },
+    {
+      label: 'Recommendation corpus searched',
+      found: collections.has('recommendations'),
+    },
+    {
+      label: 'Drug-label corpus searched',
+      found: collections.has('safety_labels'),
+    },
+  ];
+
+  const percentage = Math.round((items.filter((item) => item.found).length / items.length) * 100);
+  return {
+    percentage,
+    items,
+    explanation: response.low_confidence
+      ? 'Coverage is shown for transparency, but confidence was too low to generate an answer.'
+      : response.status === 'partial_refusal' || response.status === 'full_refusal'
+        ? 'Retrieved evidence was available, but the final answer was blocked or partially refused because claim support was incomplete.'
+        : 'Coverage reflects both the evidence returned and the claims verified against cited text.',
+  };
 }
 
 function mapStatus(status: AnswerStatus): ResultStatus {
@@ -170,6 +249,12 @@ function mapAnalyzeResponse(response: AnalyzeResponse): ClinicalResult {
   }));
 
   const firstEvidenceGrade = response.recommendations.find((r) => r.evidence_grade)?.evidence_grade;
+  const claims: GroundedClaim[] = response.recommendations.map((recommendation) => ({
+    claim: recommendation.claim,
+    excerpt: recommendation.excerpt,
+    faithfulnessStatus: recommendation.faithfulness_status,
+    verificationReason: recommendation.verification_reason ?? undefined,
+  }));
 
   return {
     id: crypto.randomUUID(),
@@ -178,14 +263,19 @@ function mapAnalyzeResponse(response: AnalyzeResponse): ClinicalResult {
     // The backend doesn't currently decompose the query (medication/intent/
     // population/etc.) — that lived only in the mock data. Leave undefined
     // rather than fabricate it; wire this up if/when the backend returns it.
-    queryUnderstanding: undefined,
+    queryUnderstanding: deriveQueryUnderstanding(response.query),
     answer: response.answer_summary || undefined,
+    claims,
     answerDisclaimer:
-      response.dropped_claim_count > 0
-        ? `${response.dropped_claim_count} claim(s) were dropped for insufficient grounding.`
-        : undefined,
+      response.recommendations.some(
+        (recommendation) => recommendation.faithfulness_status === 'unverified',
+      )
+        ? 'One or more claims could not be verified against the cited source text.'
+        : response.dropped_claim_count > 0
+          ? `${response.dropped_claim_count} claim(s) were dropped for insufficient grounding.`
+          : undefined,
     evidenceGrade: firstEvidenceGrade ?? undefined,
-    coverage: undefined, // not computed by the backend yet
+    coverage: deriveCoverage(response),
     chunks,
     retrievalTrace: {
       decomposition: {},
@@ -198,9 +288,17 @@ function mapAnalyzeResponse(response: AnalyzeResponse): ClinicalResult {
     multiSource: mapMultiSource(response),
     refusalReason: response.refusal_reason ?? undefined,
     refusalDecision: undefined,
-    missingEvidence: undefined,
-    foundEvidence: undefined,
-    limitations: undefined,
+    missingEvidence: response.low_confidence ? ['Sufficient retrieval confidence'] : undefined,
+    foundEvidence: response.retrieved_chunks.length
+      ? [`${response.retrieved_chunks.length} evidence chunk(s) retrieved`]
+      : undefined,
+    limitations: [
+      'Query understanding is inferred from the submitted wording; it is not a clinical diagnosis.',
+      'Evidence grade is only shown when the cited backend recommendation includes one.',
+      ...(response.dropped_claim_count > 0
+        ? [`${response.dropped_claim_count} claim(s) were removed during grounding validation.`]
+        : []),
+    ],
     blockedExplanation:
       response.status === 'full_refusal' ? response.refusal_reason ?? undefined : undefined,
   };

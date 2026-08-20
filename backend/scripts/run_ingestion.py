@@ -11,8 +11,10 @@ import argparse
 import sys
 from pathlib import Path
 
-# Allow running as `python scripts/run_ingestion.py` from repo root.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+# Allow running as `python backend/scripts/run_ingestion.py` from the repo root.
+_backend_dir = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(_backend_dir.parent))
+sys.path.insert(0, str(_backend_dir))
 
 from backend.src.ingestion.ingest import run_ingestion, print_report
 

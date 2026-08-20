@@ -33,6 +33,8 @@ class Recommendation:
     excerpt: str
     evidence_grade: str | None
     citation: Citation
+    faithfulness_status: str = "unverified"
+    verification_reason: str | None = None
 
 
 @dataclass

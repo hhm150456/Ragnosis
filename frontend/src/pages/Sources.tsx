@@ -15,7 +15,7 @@ export function Sources() {
       <div>
         <h1 className="text-2xl font-bold text-white sm:text-3xl">Evidence Sources</h1>
         <p className="mt-1 text-sm text-slate-400">
-          ClinGuard uses a controlled corpus of clinical recommendations and official drug-label
+          Ragnosis uses a controlled corpus of clinical recommendations and official drug-label
           information.
         </p>
       </div>

@@ -58,6 +58,7 @@ class LLMClient:
                     system_instruction=system_prompt,
                     temperature=GENERATION_TEMPERATURE,
                     max_output_tokens=GENERATION_MAX_TOKENS,
+                    response_mime_type="application/json",
                 ),
             )
             return response.text

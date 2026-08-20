@@ -24,7 +24,7 @@ from backend.api.schemas import (
     RecommendationOut,
 )
 from backend.src.generation.generator import generate_answer
-from backend.src.safety.confidence import low_confidence_reason
+from backend.src.safety.confidence import invalid_query_reason, low_confidence_reason
 
 logger = logging.getLogger("ragnosis.api.query")
 
@@ -36,6 +36,19 @@ def run_query(payload: QueryRequest) -> AnalyzeResponse:
     query_text = payload.query.strip()
     if not query_text:
         raise HTTPException(status_code=422, detail="query must not be empty")
+
+    invalid_reason = invalid_query_reason(query_text)
+    if invalid_reason is not None:
+        return AnalyzeResponse(
+            query=query_text,
+            status="full_refusal",
+            answer_summary="I cannot search the evidence corpus with this input.",
+            refusal_reason=invalid_reason,
+            recommendations=[],
+            dropped_claim_count=0,
+            retrieved_chunks=[],
+            low_confidence=True,
+        )
 
     top_k = payload.top_k or TOP_K_DEFAULT
 
@@ -80,6 +93,8 @@ def run_query(payload: QueryRequest) -> AnalyzeResponse:
             claim=rec.claim,
             excerpt=rec.excerpt,
             evidence_grade=rec.evidence_grade,
+            faithfulness_status=rec.faithfulness_status,
+            verification_reason=rec.verification_reason,
             citation=CitationOut(
                 chunk_id=rec.citation.chunk_id,
                 document_name=rec.citation.document_name,

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { FileCheck } from 'lucide-react';
 import { QueryInput } from '@/components/QueryInput';
 import { ExampleQuery } from '@/components/ExampleQuery';
@@ -17,7 +17,7 @@ const LOADING_STEPS = [
   'Retrieve evidence',
   'Verify sources',
   'Check evidence coverage',
-  'Prepare result',
+  'Finalize evidence report',
 ];
 
 export function EvidenceChecker({
@@ -32,17 +32,17 @@ export function EvidenceChecker({
   const [loadingStep, setLoadingStep] = useState(0);
   const [error, setError] = useState(false);
 
-  const runQuery = async (query: string) => {
+  const runQuery = useCallback(async (query: string) => {
     setLoading(true);
     setError(false);
     setResult(null);
     onClearInitial?.();
 
-    // Animate loading steps
+    // Keep the UI honest while retrieval/generation may wait on remote services.
     setLoadingStep(0);
     const stepTimer = setInterval(() => {
       setLoadingStep((s) => Math.min(s + 1, LOADING_STEPS.length - 1));
-    }, 300);
+    }, 1000);
 
     try {
       const res = await analyzeQueryAsync(query);
@@ -53,7 +53,13 @@ export function EvidenceChecker({
       clearInterval(stepTimer);
       setLoading(false);
     }
-  };
+  }, [onClearInitial]);
+
+  useEffect(() => {
+    if (initialQuery?.trim()) {
+      void runQuery(initialQuery);
+    }
+  }, [initialQuery, runQuery]);
 
   const reset = () => {
     setResult(null);
@@ -163,18 +169,18 @@ function LoadingState({ step }: { step: number }) {
 }
 
 function ResultView({ result }: { result: ClinicalResult }) {
-  if (result.status === 'refused' || result.status === 'out_of_scope') {
+  if (result.status === 'error') {
     return (
-      <div className="animate-slideUp space-y-6">
-        {result.queryUnderstanding && (
-          <QueryUnderstandingCard understanding={result.queryUnderstanding} />
-        )}
-        <RefusalPanel result={result} />
-        {result.retrievalTrace && <RetrievalTrace trace={result.retrievalTrace} />}
-        <Disclaimer />
+      <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-6">
+        <h2 className="text-lg font-semibold text-amber-200">Unable to analyze this question.</h2>
+        <p className="mt-1 text-sm text-slate-300">
+          {result.refusalReason ?? 'The evidence service did not return a result.'}
+        </p>
       </div>
     );
   }
+
+  const isRefused = result.status === 'refused' || result.status === 'out_of_scope';
 
   return (
     <div className="animate-slideUp space-y-6">
@@ -183,20 +189,24 @@ function ResultView({ result }: { result: ClinicalResult }) {
         <QueryUnderstandingCard understanding={result.queryUnderstanding} />
       )}
 
-      {/* Supported header */}
-      <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-6">
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10">
-            <FileCheck className="h-6 w-6 text-emerald-400" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-emerald-200">Supported by Available Evidence</h2>
-            <div className="mt-1">
-              <StatusBadge variant="supported" />
+      {isRefused ? (
+        <RefusalPanel result={result} />
+      ) : (
+        /* Supported header */
+        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10">
+              <FileCheck className="h-6 w-6 text-emerald-400" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-emerald-200">Supported by Available Evidence</h2>
+              <div className="mt-1">
+                <StatusBadge variant="supported" />
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Evidence summary */}
       {result.answer && (
@@ -211,19 +221,21 @@ function ResultView({ result }: { result: ClinicalResult }) {
 
       {/* Evidence grade + coverage */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {result.evidenceGrade && (
-          <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-5">
-            <h3 className="text-sm font-semibold text-white">Evidence Grade</h3>
-            <div className="mt-3 flex h-20 w-20 items-center justify-center rounded-full border-2 border-sky-500/40 bg-sky-500/10">
-              <span className="text-2xl font-bold text-sky-300">{result.evidenceGrade}</span>
-            </div>
-            <p className="mt-3 text-xs text-slate-500">
-              Recommendation grade from the indexed USPSTF source.
-            </p>
+        <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-5">
+          <h3 className="text-sm font-semibold text-white">Evidence Grade</h3>
+          <div className="mt-3 flex h-20 w-20 items-center justify-center rounded-full border-2 border-sky-500/40 bg-sky-500/10">
+            <span className="text-center text-lg font-bold text-sky-300">
+              {result.evidenceGrade ?? 'N/A'}
+            </span>
           </div>
-        )}
+          <p className="mt-3 text-xs text-slate-500">
+            {result.evidenceGrade
+              ? 'Recommendation grade from the indexed USPSTF source.'
+              : 'The live response did not include a recommendation grade.'}
+          </p>
+        </div>
         {result.coverage && (
-          <div className={result.evidenceGrade ? 'sm:col-span-2' : 'sm:col-span-3'}>
+          <div className="sm:col-span-2">
             <EvidenceCoverage coverage={result.coverage} />
           </div>
         )}

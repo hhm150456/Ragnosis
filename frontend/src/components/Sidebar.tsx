@@ -41,7 +41,7 @@ export function Sidebar({ activePage, onNavigate, mobileOpen, onCloseMobile }: S
             </div>
             <div>
               <div className="text-sm font-semibold tracking-wide text-white">
-                CLINGUARD
+                RAGNOSIS
               </div>
               <div className="text-[10px] text-slate-400 leading-tight">
                 Evidence-Grounded
