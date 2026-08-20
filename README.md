@@ -151,9 +151,10 @@ VITE_API_BASE_URL=http://localhost:8000
 ## Railway deployment
 
 Deploy the backend and frontend as two Railway services from this repository.
-For the backend, set the service root directory to `backend/` and select
-`Dockerfile` as the builder file. Alternatively, leave Railpack enabled and
-use the root `Procfile` from a repository-root service.
+For the backend, use the repository root as the service root directory and
+set the Dockerfile path to `backend/Dockerfile`. If using Railpack instead,
+leave the service root at the repository root; `requirements.txt` includes the
+backend dependencies and the root `Procfile` provides the start command.
 The backend start command is:
 
 ```bash
