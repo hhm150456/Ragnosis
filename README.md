@@ -174,6 +174,8 @@ GEMINI_API_KEY=your_gemini_key
 SUPABASE_URL=your_supabase_project_url
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 FRONTEND_URL=https://your-frontend-service.up.railway.app
+# Optional: comma-separated preview and production frontend origins
+# FRONTEND_URLS=https://your-frontend-service.up.railway.app,https://preview.example.com
 ```
 
 Set this frontend variable before deploying or redeploying the frontend:

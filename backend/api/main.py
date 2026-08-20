@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -52,6 +53,17 @@ from backend.api.schemas import HealthResponse  # noqa: E402
 
 logger = logging.getLogger("ragnosis.api")
 
+
+def _cors_origins() -> list[str]:
+    configured = os.getenv("FRONTEND_URLS", os.getenv("FRONTEND_URL", ""))
+    origins = {
+        origin.strip().rstrip("/")
+        for origin in configured.split(",")
+        if origin.strip()
+    }
+    origins.update({"http://localhost:5173", "http://127.0.0.1:5173"})
+    return sorted(origins)
+
 app = FastAPI(
     title="Ragnosis Clinical RAG API",
     description=(
@@ -61,15 +73,12 @@ app = FastAPI(
     version="0.2.0",
 )
 
-# Vite's default dev server ports. Add production origins here (or read them
-# from an env var) once the frontend is deployed somewhere real.
+# FRONTEND_URLS accepts a comma-separated list so preview and production
+# frontends can share one backend deployment.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        os.getenv("FRONTEND_URL", "https://ragnosis-ui.onrender.com"),
-    ],
+    allow_origins=_cors_origins(),
+    allow_origin_regex=r"https://[A-Za-z0-9-]+(?:\.up)?\.railway\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
