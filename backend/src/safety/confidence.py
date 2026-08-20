@@ -21,7 +21,9 @@ this gate — this is a pre-filter, not a replacement for that validation.
 
 from __future__ import annotations
 
-from config import MIN_CONFIDENCE_THRESHOLD
+import re
+
+from config import MIN_CONFIDENCE_THRESHOLD, OUT_OF_CORPUS_QUERY_TERMS
 
 
 def invalid_query_reason(query: str) -> str | None:
@@ -36,7 +38,7 @@ def invalid_query_reason(query: str) -> str | None:
     return None
 
 
-def low_confidence_reason(retrieval_results: dict[str, list]) -> str | None:
+def low_confidence_reason(query: str, retrieval_results: dict[str, list]) -> str | None:
     """
     retrieval_results: output of HybridRetriever.retrieve_compound(), keyed
         by collection name.
@@ -44,6 +46,12 @@ def low_confidence_reason(retrieval_results: dict[str, list]) -> str | None:
     Returns a human-readable refusal reason if retrieval confidence is too
     low to proceed to generation, or None if it's fine to continue.
     """
+    query_terms = set(re.findall(r"[a-z0-9]+", query.casefold()))
+    unsupported_terms = query_terms & OUT_OF_CORPUS_QUERY_TERMS
+    if unsupported_terms:
+        terms = ", ".join(sorted(unsupported_terms))
+        return f"The query mentions out-of-corpus subject matter: {terms}."
+
     all_chunks = [chunk for chunks in retrieval_results.values() for chunk in chunks]
     if not all_chunks:
         return None

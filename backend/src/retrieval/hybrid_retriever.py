@@ -23,6 +23,7 @@ This module never talks to an LLM — it only returns evidence. Generation
 from dataclasses import dataclass
 
 from config import (
+    COLLECTION_QUERY_ANCHORS,
     COLLECTION_RECOMMENDATIONS,
     COLLECTION_SAFETY_LABELS,
     TOP_K_DEFAULT,
@@ -101,6 +102,10 @@ class HybridRetriever:
     ) -> list[RetrievedChunk]:
         total = self.store.collection_stats(collection_name)["count"]
         if not total:
+            return []
+
+        query_lower = query.casefold()
+        if not any(anchor in query_lower for anchor in COLLECTION_QUERY_ANCHORS[collection_name]):
             return []
 
         # Widen the candidate pool beyond top_k before merging, so a chunk

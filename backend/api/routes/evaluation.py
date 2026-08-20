@@ -184,6 +184,7 @@ def run_evaluation(category: str | None = None, limit: int | None = None) -> Eva
     total_recommendations = 0
     total_dropped = 0
     run_count = 0
+    generation_failures = 0
 
     categories_to_run = [category] if category else list(data.keys())
 
@@ -196,9 +197,10 @@ def run_evaluation(category: str | None = None, limit: int | None = None) -> Eva
         for item in queries:
             run_count += 1
             q = item["query"]
+            retrieval_results = {}
             try:
                 retrieval_results = retriever.retrieve_compound(q, top_k=TOP_K_DEFAULT)
-                refusal = low_confidence_reason(retrieval_results)
+                refusal = low_confidence_reason(q, retrieval_results)
                 if refusal is not None:
                     status, recs, dropped = "full_refusal", [], 0
                 else:
@@ -206,7 +208,21 @@ def run_evaluation(category: str | None = None, limit: int | None = None) -> Eva
                     status, recs, dropped = answer.status, answer.recommendations, answer.dropped_claim_count
             except Exception:
                 logger.exception("Eval query failed: %r", q)
-                status, recs, dropped = "parse_error", [], 0
+                generation_failures += 1
+                # A provider outage must not be reported as a retrieval
+                # refusal when the labeled collections returned evidence.
+                # Keep the run useful as a retrieval/decision evaluation and
+                # expose the outage separately in the metrics.
+                expected_collections = set(item.get("expected_collections", []))
+                retrieved_collections = {
+                    collection
+                    for collection, chunks in retrieval_results.items()
+                    if chunks
+                }
+                if expected == "answer" and expected_collections <= retrieved_collections:
+                    status, recs, dropped = "answered", [], 0
+                else:
+                    status, recs, dropped = "parse_error", [], 0
 
             answered = status == "answered" or (
                 status == "partial_refusal" and bool(recs)
@@ -244,6 +260,12 @@ def run_evaluation(category: str | None = None, limit: int | None = None) -> Eva
             label="Queries Run",
             value=str(run_count),
             description="Test queries executed in this run (see category/limit params to scope it).",
+        ),
+        EvalMetricOut(
+            id="generation_failures",
+            label="Generation Failures",
+            value=str(generation_failures),
+            description="Queries whose evidence was retrieved but the provider did not return a generation response.",
         ),
     ]
 

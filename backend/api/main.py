@@ -31,6 +31,7 @@ launched from. This must run before any local imports below.
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -67,6 +68,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        os.getenv("FRONTEND_URL", "https://ragnosis-ui.onrender.com"),
     ],
     allow_credentials=True,
     allow_methods=["*"],

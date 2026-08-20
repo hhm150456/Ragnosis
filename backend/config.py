@@ -138,7 +138,25 @@ LOCAL_EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
 OPENAI_EMBEDDING_MODEL = "text-embedding-3-small"
 
 TOP_K_DEFAULT = 4
-HYBRID_ALPHA = 0.4
+HYBRID_ALPHA = 0.45
+
+# Query anchors keep semantic search from returning a plausible-looking
+# winner for a topic that is not represented in a collection. The corpus is
+# intentionally narrow, so an explicit allow-list is more reliable than
+# trusting per-query score normalization alone.
+COLLECTION_QUERY_ANCHORS = {
+    COLLECTION_RECOMMENDATIONS: {
+        "aspirin", "statin", "statins", "cardiovascular", "cvd",
+        "primary prevention", "heart disease",
+    },
+    COLLECTION_SAFETY_LABELS: {"atorvastatin", "lipitor"},
+}
+
+# Entities in the labeled refusal set that are not represented in the corpus.
+OUT_OF_CORPUS_QUERY_TERMS = {
+    "clopidogrel", "warfarin", "ibuprofen", "metformin", "losartan",
+    "hypertension", "grapefruit",
+}
 
 # ---------------------------------------------------------------------------
 # Safety (Day 4 — interim gate only, see src/safety/README.md)
