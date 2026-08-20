@@ -148,6 +148,34 @@ If the backend is not on the default host/port, create `frontend/.env.local` wit
 VITE_API_BASE_URL=http://localhost:8000
 ```
 
+## Railway deployment
+
+Deploy the backend and frontend as two Railway services from this repository.
+For both services, leave the service root directory at the repository root and
+set the Dockerfile path to the service-specific file:
+
+- Backend: `backend/Dockerfile`
+- Frontend: `frontend/Dockerfile`
+
+Set these backend variables in Railway:
+
+```env
+GENERATION_BACKEND=gemini
+GEMINI_API_KEY=your_gemini_key
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+FRONTEND_URL=https://your-frontend-service.up.railway.app
+```
+
+Set this frontend variable before deploying or redeploying the frontend:
+
+```env
+VITE_API_BASE_URL=https://your-backend-service.up.railway.app
+```
+
+Railway injects `PORT` automatically. The backend listens on it, and the
+frontend container serves its production bundle through Nginx on port 80.
+
 ## Recommended workflow
 
 1. Configure Supabase and `backend/.env` values
