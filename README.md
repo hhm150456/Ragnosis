@@ -151,16 +151,17 @@ VITE_API_BASE_URL=http://localhost:8000
 ## Railway deployment
 
 Deploy the backend and frontend as two Railway services from this repository.
-For the backend, either select Dockerfile as the builder and set its path to
-`backend/Dockerfile`, or leave Railpack enabled and use the root `Procfile`.
+For the backend, set the service root directory to `backend/` and select
+`Dockerfile` as the builder file. Alternatively, leave Railpack enabled and
+use the root `Procfile` from a repository-root service.
 The backend start command is:
 
 ```bash
 uvicorn backend.api.main:app --host 0.0.0.0 --port $PORT
 ```
 
-For the frontend, select Dockerfile as the builder and set its path to the
-service-specific file:
+For the frontend, set the service root directory to `frontend/` and select
+`Dockerfile` as the builder file:
 
 - Frontend: `frontend/Dockerfile`
 
