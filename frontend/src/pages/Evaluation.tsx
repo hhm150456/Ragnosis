@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useState } from 'react';
 import {
   BarChart,
   Bar,
@@ -10,11 +11,7 @@ import {
 } from 'recharts';
 import { MetricCard } from '@/components/MetricCard';
 import { Disclaimer } from '@/components/Disclaimer';
-import {
-  EVALUATION_METRICS,
-  QUERY_OUTCOMES,
-  EVALUATION_CATEGORIES,
-} from '@/data/mockData';
+import { getEvaluation, runEvaluation, type EvaluationResponse } from '@/services/clinicalService';
 
 const BAR_COLORS: Record<string, string> = {
   Supported: '#0ea5e9',
@@ -24,35 +21,95 @@ const BAR_COLORS: Record<string, string> = {
 };
 
 export function Evaluation() {
+  const [evaluation, setEvaluation] = useState<EvaluationResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadEvaluation = useCallback(async (signal?: AbortSignal) => {
+    setLoading(true);
+    setError(null);
+    try {
+      setEvaluation(await getEvaluation(signal));
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      setError(err instanceof Error ? err.message : 'Could not load evaluation data.');
+    } finally {
+      if (!signal?.aborted) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadEvaluation(controller.signal);
+    return () => controller.abort();
+  }, [loadEvaluation]);
+
+  const handleRun = async () => {
+    setRunning(true);
+    setError(null);
+    try {
+      setEvaluation(await runEvaluation());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not run the evaluation.');
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const metrics = evaluation?.metrics ?? [];
+  const outcomes = evaluation?.outcomes ?? [];
+  const categories = evaluation?.categories ?? [];
+
   return (
     <div className="space-y-8">
       <div>
-        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-400">
-          Prototype Evaluation
-        </span>
-        <h1 className="mt-2 text-2xl font-bold text-white sm:text-3xl">System Evaluation</h1>
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+          <div>
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-400">
+              Live Evaluation
+            </span>
+            <h1 className="mt-2 text-2xl font-bold text-white sm:text-3xl">System Evaluation</h1>
+          </div>
+          <button
+            type="button"
+            onClick={handleRun}
+            disabled={loading || running}
+            className="inline-flex items-center justify-center rounded-lg bg-sky-500 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {running ? 'Running evaluation...' : 'Run evaluation'}
+          </button>
+        </div>
         <p className="mt-1 text-sm text-slate-400">
-          Measure retrieval quality, grounding, and controlled refusal.
+          Measure retrieval quality, grounding, and controlled refusal against the labeled test set.
         </p>
       </div>
 
+      {error && (
+        <div className="flex items-center justify-between gap-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          <span>{error}</span>
+          <button type="button" onClick={() => void loadEvaluation()} className="font-semibold text-red-300 hover:text-white">
+            Retry
+          </button>
+        </div>
+      )}
+
+      {loading && <p className="text-sm text-slate-400">Loading evaluation summary...</p>}
+
       {/* Metric cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {EVALUATION_METRICS.map((m) => (
+        {metrics.map((m) => (
           <MetricCard key={m.id} label={m.label} value={m.value} description={m.description} />
         ))}
       </div>
-      <p className="text-xs italic text-slate-500">
-        Demonstration values only. Replace with measured evaluation results before final
-        presentation.
-      </p>
+      {evaluation && <p className="text-xs italic text-slate-500">{evaluation.note}</p>}
 
       {/* Chart */}
       <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-6">
         <h2 className="text-sm font-semibold text-white">Query Outcomes</h2>
         <div className="mt-6 h-72 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={QUERY_OUTCOMES} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <BarChart data={outcomes} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
               <XAxis
                 dataKey="name"
@@ -71,7 +128,7 @@ export function Evaluation() {
                 }}
               />
               <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                {QUERY_OUTCOMES.map((entry) => (
+                {outcomes.map((entry) => (
                   <Cell key={entry.name} fill={BAR_COLORS[entry.name] ?? '#0ea5e9'} />
                 ))}
               </Bar>
@@ -82,12 +139,12 @@ export function Evaluation() {
 
       {/* Categories */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {EVALUATION_CATEGORIES.map((cat) => (
+        {categories.map((cat) => (
           <div key={cat.id} className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-5">
             <h3 className="text-sm font-semibold text-white">{cat.title}</h3>
-            <p className="mt-1.5 text-xs text-slate-400">{cat.description}</p>
+            <p className="mt-1.5 text-xs text-slate-400">{cat.description} Expected: {cat.expected_behavior}.</p>
             <ul className="mt-3 space-y-1.5">
-              {cat.examples.map((ex) => (
+              {cat.example_queries.map((ex) => (
                 <li key={ex} className="flex items-center gap-2 text-xs text-slate-300">
                   <span className="h-1 w-1 rounded-full bg-sky-400" />
                   {ex}

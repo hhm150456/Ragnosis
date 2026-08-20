@@ -208,7 +208,9 @@ def run_evaluation(category: str | None = None, limit: int | None = None) -> Eva
                 logger.exception("Eval query failed: %r", q)
                 status, recs, dropped = "parse_error", [], 0
 
-            answered = status == "answered"
+            answered = status == "answered" or (
+                status == "partial_refusal" and bool(recs)
+            )
             if answered:
                 total_recommendations += len(recs)
                 total_dropped += dropped

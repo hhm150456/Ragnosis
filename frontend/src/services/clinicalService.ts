@@ -68,6 +68,36 @@ interface ApiErrorBody {
   detail?: string;
 }
 
+export interface EvaluationMetricResponse {
+  id: string;
+  label: string;
+  value: string;
+  description: string;
+}
+
+export interface EvaluationOutcomeResponse {
+  name: 'Supported' | 'Correct Refusal' | 'Incorrect Refusal' | 'Unsupported Answer';
+  count: number;
+}
+
+export interface EvaluationCategoryResponse {
+  id: string;
+  title: string;
+  description: string;
+  expected_behavior: 'answer' | 'refuse';
+  query_count: number;
+  example_queries: string[];
+}
+
+export interface EvaluationResponse {
+  total_queries: number;
+  categories: EvaluationCategoryResponse[];
+  evaluated: boolean;
+  outcomes: EvaluationOutcomeResponse[];
+  metrics: EvaluationMetricResponse[];
+  note: string;
+}
+
 // --- Query request options ---------------------------------------------
 
 export interface AnalyzeOptions {
@@ -365,3 +395,40 @@ export async function analyzeQuery(query: string, options: AnalyzeOptions = {}):
  * the rest of the frontend is migrated off the mock-data flow.
  */
 export const analyzeQueryAsync = analyzeQuery;
+
+async function evaluationRequest(path: string, init?: RequestInit): Promise<EvaluationResponse> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, init);
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') throw err;
+    throw new Error(`Could not reach the backend at ${API_BASE_URL}. Is it running?`);
+  }
+
+  if (!res.ok) {
+    let detail = `Request failed with status ${res.status}.`;
+    try {
+      const body = (await res.json()) as ApiErrorBody;
+      if (body.detail) detail = body.detail;
+    } catch {
+      // Keep the HTTP status when the response is not JSON.
+    }
+    throw new Error(detail);
+  }
+
+  return (await res.json()) as EvaluationResponse;
+}
+
+export function getEvaluation(signal?: AbortSignal): Promise<EvaluationResponse> {
+  return evaluationRequest('/api/evaluation', { signal });
+}
+
+export function runEvaluation(options: { category?: string; limit?: number } = {}): Promise<EvaluationResponse> {
+  const params = new URLSearchParams();
+  if (options.category) params.set('category', options.category);
+  if (options.limit !== undefined) params.set('limit', String(options.limit));
+  const query = params.toString();
+  return evaluationRequest(`/api/evaluation/run${query ? `?${query}` : ''}`, {
+    method: 'POST',
+  });
+}

@@ -147,7 +147,7 @@ HYBRID_ALPHA = 0.4
 # just the cheapest, first piece: if the best retrieved chunk's combined
 # score falls below this, refuse before spending a generation call at all.
 # See src/safety/confidence.py.
-MIN_CONFIDENCE_THRESHOLD = 0.15
+MIN_CONFIDENCE_THRESHOLD = 0.05
 
 # ---------------------------------------------------------------------------
 # Reranking (optional cross-encoder pass, see src/retrieval/reranker.py)
