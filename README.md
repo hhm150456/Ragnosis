@@ -161,10 +161,10 @@ The backend start command is:
 uvicorn backend.api.main:app --host 0.0.0.0 --port $PORT
 ```
 
-For the frontend, use the repository root as the service root directory and
-set the Dockerfile path to `frontend/Dockerfile`:
+For the frontend, set the service root directory to `frontend/` and select
+`Dockerfile` as the builder file:
 
-- Frontend: `frontend/Dockerfile`
+- Frontend Dockerfile: `frontend/Dockerfile`
 
 Set these backend variables in Railway:
 
