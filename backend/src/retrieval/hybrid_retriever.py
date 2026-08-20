@@ -21,6 +21,7 @@ This module never talks to an LLM — it only returns evidence. Generation
 """
 
 from dataclasses import dataclass
+from concurrent.futures import ThreadPoolExecutor
 
 from config import (
     COLLECTION_QUERY_ANCHORS,
@@ -98,7 +99,11 @@ class HybridRetriever:
         return candidates
 
     def retrieve_single(
-        self, query: str, collection_name: str, top_k: int = TOP_K_DEFAULT
+        self,
+        query: str,
+        collection_name: str,
+        top_k: int = TOP_K_DEFAULT,
+        query_embedding: list[float] | None = None,
     ) -> list[RetrievedChunk]:
         total = self.store.collection_stats(collection_name)["count"]
         if not total:
@@ -113,7 +118,8 @@ class HybridRetriever:
         # to surface once scores are combined.
         pool_size = min(max(top_k * 4, 10), total)
 
-        query_embedding = self.embedder.embed_query(query)
+        if query_embedding is None:
+            query_embedding = self.embedder.embed_query(query)
         semantic_candidates = self._semantic_search(query_embedding, collection_name, pool_size)
 
         bm25_index = self._get_bm25_index(collection_name)
@@ -173,9 +179,30 @@ class HybridRetriever:
         representation from BOTH evidence types, rather than hoping a single
         pooled top-k search happens to surface both — which it may not.
         """
+        eligible_collections = [
+            collection_name
+            for collection_name in (
+                COLLECTION_RECOMMENDATIONS,
+                COLLECTION_SAFETY_LABELS,
+            )
+            if any(anchor in query.casefold() for anchor in COLLECTION_QUERY_ANCHORS[collection_name])
+        ]
+        query_embedding = self.embedder.embed_query(query) if eligible_collections else None
+
+        def retrieve(collection_name: str) -> tuple[str, list[RetrievedChunk]]:
+            return collection_name, self.retrieve_single(
+                query,
+                collection_name,
+                top_k,
+                query_embedding=query_embedding,
+            )
+
+        with ThreadPoolExecutor(max_workers=len(eligible_collections) or 1) as executor:
+            results = dict(executor.map(retrieve, eligible_collections))
+
         return {
-            COLLECTION_RECOMMENDATIONS: self.retrieve_single(query, COLLECTION_RECOMMENDATIONS, top_k),
-            COLLECTION_SAFETY_LABELS: self.retrieve_single(query, COLLECTION_SAFETY_LABELS, top_k),
+            COLLECTION_RECOMMENDATIONS: results.get(COLLECTION_RECOMMENDATIONS, []),
+            COLLECTION_SAFETY_LABELS: results.get(COLLECTION_SAFETY_LABELS, []),
         }
 
 

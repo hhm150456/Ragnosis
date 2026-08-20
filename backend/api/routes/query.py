@@ -69,7 +69,7 @@ def run_query(payload: QueryRequest) -> AnalyzeResponse:
     retrieved_chunks = chunks_to_schema(retrieval_results)
 
     # --- safety: cheap confidence gate before spending a generation call ---
-    refusal = low_confidence_reason(retrieval_results)
+    refusal = low_confidence_reason(query_text, retrieval_results)
     if refusal is not None:
         return AnalyzeResponse(
             query=query_text,
