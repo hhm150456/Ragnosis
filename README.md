@@ -154,9 +154,7 @@ Deploy the backend and frontend as two Railway services from this repository.
 For the backend, use the repository root as the service root directory and
 set the Dockerfile path to `backend/Dockerfile`. The Docker build context must
 be the project root, not `backend/`, because the Dockerfile copies paths under
-the `backend/` directory. If using Railpack instead, leave the service root at
-the repository root; `requirements.txt` includes the backend dependencies and
-the root `Procfile` provides the start command.
+the `backend/` directory. Use the Docker builder for this service.
 The backend start command is:
 
 ```bash
