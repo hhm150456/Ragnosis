@@ -152,13 +152,15 @@ VITE_API_BASE_URL=http://localhost:8000
 
 Deploy the backend and frontend as two Railway services from this repository.
 For the backend, use the repository root as the service root directory and
-set the Dockerfile path to `backend/Dockerfile`. If using Railpack instead,
-leave the service root at the repository root; `requirements.txt` includes the
-backend dependencies and the root `Procfile` provides the start command.
+set the Dockerfile path to `backend/Dockerfile`. The Docker build context must
+be the project root, not `backend/`, because the Dockerfile copies paths under
+the `backend/` directory. If using Railpack instead, leave the service root at
+the repository root; `requirements.txt` includes the backend dependencies and
+the root `Procfile` provides the start command.
 The backend start command is:
 
 ```bash
-uvicorn backend.api.main:app --host 0.0.0.0 --port $PORT
+python -m uvicorn backend.api.main:app --host 0.0.0.0 --port $PORT
 ```
 
 For the frontend, set the service root directory to `frontend/` and select
@@ -179,8 +181,11 @@ FRONTEND_URL=https://your-frontend-service.up.railway.app
 Set this frontend variable before deploying or redeploying the frontend:
 
 ```env
-VITE_API_BASE_URL=https://your-backend-service.up.railway.app
+BACKEND_URL=https://your-backend-service.up.railway.app
 ```
+
+The frontend sends `/api/*` requests to its own origin, and Nginx forwards
+them to `BACKEND_URL`. Leave `VITE_API_BASE_URL` unset in the frontend service.
 
 Railway injects `PORT` automatically. The backend listens on it, and the
 frontend container serves its production bundle through Nginx on port 80.
